@@ -60,7 +60,7 @@ namespace UrlShortener.Api.Controllers
             return Ok(response);
         }
 
-        [HttpGet("{code:length(6,16)}")]
+        [HttpGet("{code:regex(^[[A-Za-z0-9]]{{6,16}}$)}")]
         public async Task<IActionResult> RedirectToOriginal(string code)
         {
             var mapping = await _service.GetByCodeAsync(code);
