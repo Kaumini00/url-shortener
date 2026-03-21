@@ -1,0 +1,83 @@
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { authService } from '../services/authService';
+import '../styles/Register.scss';
+
+const Register = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      await authService.register(email, password);
+      navigate('/login');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="register-page min-h-screen flex justify-center items-center">
+      <div className="register-container">
+        <div className="register-header">
+          <h2>Create your account</h2>
+        </div>
+        <form className="register-form" onSubmit={handleSubmit}>
+          <div className="form-group input-group">
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              className="input-field"
+              placeholder="Email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              className="input-field"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          {error && (
+            <div className="error-message">{error}</div>
+          )}
+
+          <div className="form-group">
+            <button
+              type="submit"
+              disabled={loading}
+              className="submit-btn"
+            >
+              {loading ? 'Registering...' : 'Register'}
+            </button>
+          </div>
+
+          <div className="auth-link">
+            <Link to="/login">
+              Already have an account? Sign in
+            </Link>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default Register;
