@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Projects/url-shortener -not -path */node_modules/* -not -path */.git/* -type f)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

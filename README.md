@@ -1,42 +1,300 @@
 # URL Shortener
 
-A full-stack URL shortening service built with Node.js, Express, PostgreSQL, and React. Features user authentication, URL shortening, and click tracking.
+A production-grade, full-stack URL shortening service built with Node.js, Express, PostgreSQL, and React.
 
 ## 🚀 Features
 
-- **User Authentication**: Secure registration and login with JWT tokens
-- **URL Shortening**: Convert long URLs into short, shareable links
-- **Click Tracking**: Monitor how many times each shortened URL has been accessed
-- **RESTful API**: Well-documented endpoints for all operations
-- **Database**: PostgreSQL with proper schema and relationships
+- **JWT Authentication** — Secure register/login; all write operations are protected
+- **URL Shortening** — Convert any long URL into a short, shareable link
+- **Custom Aliases** — Choose your own slug (e.g. `/my-portfolio`) instead of a random code
+- **Click Analytics** — Per-link total clicks, last-accessed timestamp, and daily click breakdown (last 30 days)
+- **IP & User-Agent Tracking** — Every redirect records visitor IP and browser info
+- **Copy to Clipboard** — One-click copy on every URL card in the dashboard
+- **Rate Limiting** — 100 req/15 min globally; 10 req/15 min on auth routes
+- **Proper Error Handling** — Global error handler; consistent HTTP status codes throughout
+- **User-Specific URLs** — Each user sees only their own links
+- **Protected Routes** — Frontend and backend both enforce authentication
+
+---
+
+## 🏗 Architecture
+
+```
+┌────────────────────────────────────────────────────────┐
+│                     React Frontend                     │
+│  Login / Register / Dashboard (Vite + React Router)   │
+└──────────────────────┬─────────────────────────────────┘
+                       │ HTTP (Axios + JWT Bearer token)
+┌──────────────────────▼─────────────────────────────────┐
+│                   Express Backend                       │
+│                                                        │
+│  Middleware stack:                                     │
+│    helmet → cors → rate-limit → json → routes         │
+│                                                        │
+│  Routes                                                │
+│    /auth          → authRoutes → authController        │
+│    /shorten       → urlRoutes  → urlController         │
+│    /links         → urlRoutes  → urlController         │
+│    /analytics/:c  → urlRoutes  → urlController         │
+│    /:shortCode    → urlRoutes  → redirect              │
+│                                                        │
+│  Services → Models → PostgreSQL (pg Pool)             │
+└──────────────────────┬─────────────────────────────────┘
+                       │
+┌──────────────────────▼─────────────────────────────────┐
+│                    PostgreSQL                           │
+│   users | urls | url_clicks                            │
+└────────────────────────────────────────────────────────┘
+```
+
+**Request lifecycle (URL redirect):**
+1. Browser hits `GET /:shortCode`
+2. `urlController.redirect` looks up the short code in `urls`
+3. If found → increments `urls.clicks`, inserts a row in `url_clicks` (IP, UA, timestamp)
+4. Returns `302` to `long_url`
+
+---
 
 ## 🛠 Tech Stack
 
-### Backend
-- **Node.js** - Runtime environment
-- **Express.js** - Web framework
-- **PostgreSQL** - Database
-- **JWT** - Authentication
-- **bcrypt** - Password hashing
-- **pg** - PostgreSQL client
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Node.js |
+| Framework | Express.js |
+| Database | PostgreSQL |
+| Auth | JWT + bcryptjs |
+| Security | helmet, express-rate-limit |
+| ORM/Client | pg (node-postgres) |
+| Frontend | React 19 + React Router 7 |
+| HTTP client | Axios |
+| Styling | SCSS |
+| Build tool | Vite |
+| Testing | Jest, Supertest, React Testing Library |
 
-### Frontend
-- **React** - UI library
-- **React Router** - Client-side routing
-- **Axios** - HTTP client
-- **SCSS** - Styling
-- **React Icons** - Icon library
-- **Vite** - Build tool
+---
 
 ## 📖 API Documentation
 
-### Authentication Endpoints
+All endpoints return JSON. Authenticated endpoints require `Authorization: Bearer <token>`.
 
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
+### Authentication
 
-### URL Management Endpoints
+#### `POST /auth/register`
+Register a new user.
 
-- `POST /api/urls/shorten` - Create shortened URL (requires auth)
-- `GET /api/urls` - Get user's URLs (requires auth)
-- `GET /:shortCode` - Redirect to original URL
+**Body:**
+```json
+{ "email": "user@example.com", "password": "yourpassword" }
+```
+**Response `201`:**
+```json
+{ "id": 1, "email": "user@example.com" }
+```
+
+#### `POST /auth/login`
+Login and receive a JWT token.
+
+**Body:**
+```json
+{ "email": "user@example.com", "password": "yourpassword" }
+```
+**Response `200`:**
+```json
+{ "token": "<jwt>", "user": { "id": 1, "email": "user@example.com" } }
+```
+
+---
+
+### URL Management
+
+#### `POST /shorten` 🔒
+Create a shortened URL. Optionally provide a custom alias.
+
+**Body:**
+```json
+{
+  "longUrl": "https://example.com/very/long/url",
+  "customAlias": "my-link"
+}
+```
+`customAlias` is optional. Must be 3–50 characters: letters, numbers, hyphens, underscores.
+
+**Response `201`:**
+```json
+{
+  "id": 1,
+  "long_url": "https://example.com/very/long/url",
+  "short_code": "my-link",
+  "clicks": 0,
+  "created_at": "2026-03-23T10:00:00.000Z"
+}
+```
+
+#### `GET /links` 🔒
+Get all shortened URLs belonging to the authenticated user.
+
+**Response `200`:**
+```json
+{
+  "urls": [
+    { "id": 1, "long_url": "...", "short_code": "my-link", "clicks": 5, "created_at": "..." }
+  ]
+}
+```
+
+#### `GET /:shortCode`
+Redirect to the original URL (increments click counter, records IP + user-agent).
+
+**Response:** `302 Found` → original URL
+**Response `404`** if short code doesn't exist.
+
+#### `GET /analytics/:shortCode` 🔒
+Get click analytics for a specific short URL.
+
+**Response `200`:**
+```json
+{
+  "totalClicks": 25,
+  "lastAccessed": "2026-03-22T10:00:00.000Z",
+  "dailyClicks": [
+    { "date": "2026-03-22", "count": 10 },
+    { "date": "2026-03-21", "count": 15 }
+  ]
+}
+```
+
+---
+
+### HTTP Status Codes
+
+| Code | Meaning |
+|------|---------|
+| 200 | OK |
+| 201 | Created |
+| 302 | Redirect |
+| 400 | Bad Request — missing or invalid input |
+| 401 | Unauthorized — missing or invalid JWT |
+| 404 | Not Found — short code doesn't exist |
+| 409 | Conflict — email or alias already taken |
+| 429 | Too Many Requests — rate limit exceeded |
+| 500 | Internal Server Error |
+
+---
+
+## 🗄 Database Schema
+
+```sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL
+);
+
+CREATE TABLE urls (
+  id SERIAL PRIMARY KEY,
+  long_url TEXT NOT NULL,
+  short_code TEXT UNIQUE NOT NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  clicks INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE url_clicks (
+  id SERIAL PRIMARY KEY,
+  short_code TEXT NOT NULL REFERENCES urls(short_code) ON DELETE CASCADE,
+  clicked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ip_address TEXT,
+  user_agent TEXT
+);
+```
+
+---
+
+## 🧪 Testing
+
+Tests are written with **Jest** (backend) and **React Testing Library** (frontend). Backend integration tests use **Supertest** and run against a real PostgreSQL database.
+
+### Coverage
+
+| Area | Tests |
+|------|-------|
+| Auth — register, login, duplicate email, bad password, missing fields | ✅ |
+| URL — shorten, custom alias, duplicate alias, invalid alias, list, redirect, 404 | ✅ |
+| Analytics — success response, 404 for unknown code | ✅ |
+| Auth middleware — 401 on missing/invalid token | ✅ |
+| Frontend — Login, Register, Dashboard, PrivateRoute components | ✅ |
+
+### Run tests
+
+```bash
+# Backend (requires a running PostgreSQL instance with .env set)
+cd backend && npm test
+
+# Frontend
+cd frontend && npm test
+```
+
+---
+
+## ⚙️ Setup & Running
+
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 14+
+
+### 1. Database
+```bash
+psql -U postgres -c "CREATE DATABASE urlshortener;"
+psql -U postgres -d urlshortener -f backend/migrations.sql
+```
+
+### 2. Backend
+```bash
+cd backend
+cp .env.example .env   # fill in DB credentials and JWT_SECRET
+npm install
+npm run dev            # starts on http://localhost:3000
+```
+
+**`.env` variables:**
+```
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=yourpassword
+DB_NAME=urlshortener
+JWT_SECRET=a-long-random-secret
+```
+
+### 3. Frontend
+```bash
+cd frontend
+npm install
+npm run dev            # starts on http://localhost:5173
+```
+
+---
+
+## 📈 Scalability Considerations
+
+This project is built with scale in mind:
+
+**Horizontal scaling**
+- The Express server is stateless (auth via JWT, no server-side sessions), so multiple instances can run behind a load balancer without sticky sessions.
+
+**Database**
+- The `url_clicks` table is append-only — write-heavy but trivially shardable by `short_code`.
+- Click counts are stored redundantly on `urls.clicks` (fast single-field read) and in detail on `url_clicks` (accurate analytics). This trades a bit of storage for O(1) click-count reads.
+- Indexes on `short_code` (already UNIQUE, so indexed) make `GET /:shortCode` fast even at millions of rows.
+
+**Caching (next step)**
+- The redirect path (`GET /:shortCode`) is the hottest endpoint. A Redis layer in front of the DB lookup would cut latency from ~5 ms to <1 ms and reduce DB load by 99%+ for popular links.
+
+**Rate limiting**
+- `express-rate-limit` with an in-memory store works for a single server. For multi-instance deployments, swap the store for `rate-limit-redis` to share counters across instances.
+
+**Short code collisions**
+- The base-62 generator produces 56 billion unique 6-character codes — enough for hundreds of millions of URLs before the retry logic becomes a concern.
+
+**Analytics aggregation**
+- For very high traffic, pre-aggregate `url_clicks` into hourly/daily summary tables via a background job (e.g. pg_cron) rather than querying raw rows on every analytics request.

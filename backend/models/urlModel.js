@@ -6,8 +6,7 @@ async function createUrl(longUrl, shortCode, userId) {
     VALUES($1, $2, $3)
     RETURNING id, long_url, short_code, user_id, clicks, created_at;
   `;
-  const values = [longUrl, shortCode, userId];
-  const { rows } = await db.query(text, values);
+  const { rows } = await db.query(text, [longUrl, shortCode, userId]);
   return rows[0];
 }
 
@@ -37,4 +36,51 @@ async function existsShortCode(shortCode) {
   return rows.length > 0;
 }
 
-module.exports = { createUrl, findUrlByShortCode, getUrlsByUserId, incrementClicks, existsShortCode };
+async function recordClick(shortCode, ipAddress, userAgent) {
+  await db.query(
+    'INSERT INTO url_clicks(short_code, ip_address, user_agent) VALUES($1, $2, $3)',
+    [shortCode, ipAddress, userAgent]
+  );
+}
+
+async function getClickAnalytics(shortCode) {
+  const urlResult = await db.query(
+    'SELECT clicks FROM urls WHERE short_code = $1',
+    [shortCode]
+  );
+  if (!urlResult.rows[0]) return null;
+
+  const lastAccessedResult = await db.query(
+    'SELECT MAX(clicked_at) AS last_accessed FROM url_clicks WHERE short_code = $1',
+    [shortCode]
+  );
+
+  const dailyResult = await db.query(
+    `SELECT DATE(clicked_at) AS date, COUNT(*)::int AS count
+     FROM url_clicks
+     WHERE short_code = $1
+     GROUP BY DATE(clicked_at)
+     ORDER BY date DESC
+     LIMIT 30`,
+    [shortCode]
+  );
+
+  return {
+    totalClicks: urlResult.rows[0].clicks,
+    lastAccessed: lastAccessedResult.rows[0].last_accessed,
+    dailyClicks: dailyResult.rows.map((row) => ({
+      date: row.date,
+      count: row.count,
+    })),
+  };
+}
+
+module.exports = {
+  createUrl,
+  findUrlByShortCode,
+  getUrlsByUserId,
+  incrementClicks,
+  existsShortCode,
+  recordClick,
+  getClickAnalytics,
+};

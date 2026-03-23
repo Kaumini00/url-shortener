@@ -112,6 +112,46 @@
           }
         }
 
+        .alias-row {
+          display: flex;
+          align-items: center;
+          gap: 0;
+          margin-bottom: 0.75rem;
+          background-color: #2a2a2a;
+          border: 1px solid #444444;
+          border-radius: 0.375rem;
+          overflow: hidden;
+          max-width: 28rem;
+
+          &:focus-within {
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+          }
+
+          .alias-prefix {
+            padding: 0.75rem 0.75rem 0.75rem 1rem;
+            color: #888888;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            background-color: #222222;
+            border-right: 1px solid #444444;
+          }
+
+          .alias-input {
+            flex: 1;
+            padding: 0.75rem;
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-size: 0.95rem;
+            outline: none;
+
+            &::placeholder {
+              color: #666666;
+            }
+          }
+        }
+
         .error-message {
           color: #e74c3c;
           font-size: 0.875rem;
@@ -288,9 +328,11 @@
             .url-card-actions {
               padding: 1rem 1.5rem 1.5rem;
               border-top: 1px solid #333333;
+              display: flex;
+              gap: 0.75rem;
 
               .action-btn {
-                width: 100%;
+                flex: 1;
                 padding: 0.75rem 1rem;
                 border: none;
                 border-radius: 0.5rem;
@@ -299,7 +341,9 @@
                 cursor: pointer;
                 transition: all 0.2s ease;
                 text-decoration: none;
-                display: inline-block;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
                 text-align: center;
 
                 &.visit-btn {
@@ -311,6 +355,22 @@
                   &:hover {
                     background-color: #29bfaa;
                     color: #0e1412;
+                    transform: translateY(-1px);
+                  }
+
+                  &:active {
+                    transform: translateY(0);
+                  }
+                }
+
+                &.analytics-btn {
+                  background-color: #2a2a2a;
+                  color: #4a90e2;
+                  border: 1px solid #4a90e2;
+
+                  &:hover {
+                    background-color: #4a90e2;
+                    color: #ffffff;
                     transform: translateY(-1px);
                   }
 
@@ -361,5 +421,177 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+}
+
+.analytics-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 1rem;
+
+  .analytics-modal {
+    background: #1f1f1f;
+    border: 1px solid #444444;
+    border-radius: 0.875rem;
+    width: 100%;
+    max-width: 36rem;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: modalEnter 0.2s ease;
+
+    .analytics-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #333333;
+
+      h3 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #ffffff;
+      }
+
+      .analytics-close-btn {
+        background: none;
+        border: none;
+        color: #888888;
+        cursor: pointer;
+        padding: 0.25rem;
+        display: flex;
+        align-items: center;
+        border-radius: 0.375rem;
+        transition: color 0.2s ease;
+
+        &:hover {
+          color: #ffffff;
+        }
+      }
+    }
+
+    .analytics-short-code {
+      padding: 0.75rem 1.5rem;
+      font-size: 0.85rem;
+      color: #4a90e2;
+      border-bottom: 1px solid #2a2a2a;
+      word-break: break-all;
+    }
+
+    .analytics-loading,
+    .analytics-error,
+    .analytics-no-data {
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: #888888;
+      font-size: 0.95rem;
+    }
+
+    .analytics-error {
+      color: #e74c3c;
+    }
+
+    .analytics-body {
+      padding: 1.5rem;
+
+      .analytics-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.75rem;
+
+        .analytics-stat {
+          background: #2a2a2a;
+          border: 1px solid #3a3a3a;
+          border-radius: 0.625rem;
+          padding: 1rem 1.25rem;
+          text-align: center;
+
+          .analytics-stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4a90e2;
+            margin-bottom: 0.25rem;
+            word-break: break-word;
+          }
+
+          .analytics-stat-label {
+            font-size: 0.75rem;
+            color: #888888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+        }
+      }
+
+      .analytics-daily {
+        h4 {
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #cccccc;
+          margin: 0 0 1rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .analytics-chart {
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+
+          .analytics-bar-row {
+            display: grid;
+            grid-template-columns: 7rem 1fr 2.5rem;
+            align-items: center;
+            gap: 0.75rem;
+
+            .analytics-bar-date {
+              font-size: 0.78rem;
+              color: #888888;
+              white-space: nowrap;
+            }
+
+            .analytics-bar-track {
+              height: 0.625rem;
+              background: #2a2a2a;
+              border-radius: 9999px;
+              overflow: hidden;
+
+              .analytics-bar-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #4a90e2, #3ff8d7);
+                border-radius: 9999px;
+                min-width: 0.25rem;
+                transition: width 0.4s ease;
+              }
+            }
+
+            .analytics-bar-count {
+              font-size: 0.8rem;
+              font-weight: 600;
+              color: #ffffff;
+              text-align: right;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
