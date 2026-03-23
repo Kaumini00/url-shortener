@@ -22,14 +22,14 @@ A production-grade, full-stack URL shortening service built with Node.js, Expres
 ```
 ┌────────────────────────────────────────────────────────┐
 │                     React Frontend                     │
-│  Login / Register / Dashboard (Vite + React Router)   │
+│  Login / Register / Dashboard (Vite + React Router)    │
 └──────────────────────┬─────────────────────────────────┘
                        │ HTTP (Axios + JWT Bearer token)
 ┌──────────────────────▼─────────────────────────────────┐
-│                   Express Backend                       │
+│                   Express Backend                      │
 │                                                        │
 │  Middleware stack:                                     │
-│    helmet → cors → rate-limit → json → routes         │
+│    helmet → cors → rate-limit → json → routes          │
 │                                                        │
 │  Routes                                                │
 │    /auth          → authRoutes → authController        │
@@ -38,12 +38,12 @@ A production-grade, full-stack URL shortening service built with Node.js, Expres
 │    /analytics/:c  → urlRoutes  → urlController         │
 │    /:shortCode    → urlRoutes  → redirect              │
 │                                                        │
-│  Services → Models → PostgreSQL (pg Pool)             │
+│  Services → Models → PostgreSQL (pg Pool)              │
 └──────────────────────┬─────────────────────────────────┘
                        │
 ┌──────────────────────▼─────────────────────────────────┐
-│                    PostgreSQL                           │
-│   users | urls | url_clicks                            │
+│                    PostgreSQL                          │
+│            users | urls | url_clicks                   │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -113,7 +113,7 @@ Create a shortened URL. Optionally provide a custom alias.
 **Body:**
 ```json
 {
-  "longUrl": "https://example.com/very/long/url",
+  "longUrl": "https://example.com/long/url",
   "customAlias": "my-link"
 }
 ```
@@ -123,7 +123,7 @@ Create a shortened URL. Optionally provide a custom alias.
 ```json
 {
   "id": 1,
-  "long_url": "https://example.com/very/long/url",
+  "long_url": "https://example.com/long/url",
   "short_code": "my-link",
   "clicks": 0,
   "created_at": "2026-03-23T10:00:00.000Z"
@@ -165,51 +165,6 @@ Get click analytics for a specific short URL.
 
 ---
 
-### HTTP Status Codes
-
-| Code | Meaning |
-|------|---------|
-| 200 | OK |
-| 201 | Created |
-| 302 | Redirect |
-| 400 | Bad Request — missing or invalid input |
-| 401 | Unauthorized — missing or invalid JWT |
-| 404 | Not Found — short code doesn't exist |
-| 409 | Conflict — email or alias already taken |
-| 429 | Too Many Requests — rate limit exceeded |
-| 500 | Internal Server Error |
-
----
-
-## 🗄 Database Schema
-
-```sql
-CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL
-);
-
-CREATE TABLE urls (
-  id SERIAL PRIMARY KEY,
-  long_url TEXT NOT NULL,
-  short_code TEXT UNIQUE NOT NULL,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  clicks INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE url_clicks (
-  id SERIAL PRIMARY KEY,
-  short_code TEXT NOT NULL REFERENCES urls(short_code) ON DELETE CASCADE,
-  clicked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  ip_address TEXT,
-  user_agent TEXT
-);
-```
-
----
-
 ## 🧪 Testing
 
 Tests are written with **Jest** (backend) and **React Testing Library** (frontend). Backend integration tests use **Supertest** and run against a real PostgreSQL database.
@@ -224,54 +179,7 @@ Tests are written with **Jest** (backend) and **React Testing Library** (fronten
 | Auth middleware — 401 on missing/invalid token | ✅ |
 | Frontend — Login, Register, Dashboard, PrivateRoute components | ✅ |
 
-### Run tests
 
-```bash
-# Backend (requires a running PostgreSQL instance with .env set)
-cd backend && npm test
-
-# Frontend
-cd frontend && npm test
-```
-
----
-
-## ⚙️ Setup & Running
-
-### Prerequisites
-- Node.js 18+
-- PostgreSQL 14+
-
-### 1. Database
-```bash
-psql -U postgres -c "CREATE DATABASE urlshortener;"
-psql -U postgres -d urlshortener -f backend/migrations.sql
-```
-
-### 2. Backend
-```bash
-cd backend
-cp .env.example .env   # fill in DB credentials and JWT_SECRET
-npm install
-npm run dev            # starts on http://localhost:3000
-```
-
-**`.env` variables:**
-```
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=yourpassword
-DB_NAME=urlshortener
-JWT_SECRET=a-long-random-secret
-```
-
-### 3. Frontend
-```bash
-cd frontend
-npm install
-npm run dev            # starts on http://localhost:5173
-```
 
 ---
 
