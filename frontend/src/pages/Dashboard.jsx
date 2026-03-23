@@ -128,7 +128,7 @@ const Dashboard = () => {
               </button>
             </div>
             <div className="alias-row">
-              <span className="alias-prefix">localhost:3000/</span>
+
               <input
                 type="text"
                 value={customAlias}
@@ -181,13 +181,6 @@ const Dashboard = () => {
                         ? url.long_url.slice(0, 72) + '…'
                         : url.long_url}
                     </p>
-
-                    {/* Activity circles */}
-                    <div className="card-circles">
-                      {[0, 1, 2, 3].map((i) => (
-                        <span key={i} className={`circle ${i < filled ? 'active' : ''}`} />
-                      ))}
-                    </div>
 
                     {/* Footer */}
                     <div className="card-footer">

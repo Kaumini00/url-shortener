@@ -2,6 +2,8 @@
 
 A production-grade, full-stack URL shortening service built with Node.js, Express, PostgreSQL, and React.
 
+![alt text](images/image.png)
+
 ## 🚀 Features
 
 - **JWT Authentication** — Secure register/login; all write operations are protected
