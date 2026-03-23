@@ -1,4 +1,3 @@
-import React from 'react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiClipboard, FiExternalLink, FiBarChart2, FiX } from 'react-icons/fi';
@@ -7,6 +6,15 @@ import { urlService } from '../services/urlService';
 import { isAuthenticated } from '../utils/localStorageHelpers';
 import '../styles/Dashboard.scss';
 
+// Returns 0–4 filled circles based on click count
+const activityLevel = (clicks) => {
+  if (clicks >= 50) return 4;
+  if (clicks >= 21) return 3;
+  if (clicks >= 6)  return 2;
+  if (clicks >= 1)  return 1;
+  return 0;
+};
+
 const Dashboard = () => {
   const [longUrl, setLongUrl] = useState('');
   const [customAlias, setCustomAlias] = useState('');
@@ -14,17 +22,14 @@ const Dashboard = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [shortening, setShortening] = useState(false);
-  const [copyText, setCopyText] = useState('');
+  const [copiedId, setCopiedId] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [analyticsUrl, setAnalyticsUrl] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isAuthenticated()) {
-      navigate('/login');
-      return;
-    }
+    if (!isAuthenticated()) { navigate('/login'); return; }
     fetchUrls();
   }, [navigate]);
 
@@ -33,7 +38,7 @@ const Dashboard = () => {
     try {
       const userUrls = await urlService.getUserUrls();
       setUrls(userUrls);
-    } catch (err) {
+    } catch {
       setError('Failed to load URLs');
     } finally {
       setLoading(false);
@@ -44,7 +49,6 @@ const Dashboard = () => {
     e.preventDefault();
     setError('');
     setShortening(true);
-
     try {
       const newUrl = await urlService.shortenUrl(longUrl, customAlias.trim() || null);
       setUrls([newUrl, ...urls]);
@@ -57,22 +61,16 @@ const Dashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    authService.logout();
-    navigate('/login');
-  };
+  const handleLogout = () => { authService.logout(); navigate('/login'); };
 
-  const getShortUrl = (shortCode) => `http://localhost:3000/${shortCode}`;
+  const getShortUrl = (code) => `http://localhost:3000/${code}`;
 
-  const handleCopy = async (url) => {
+  const handleCopy = async (url, id) => {
     try {
       await navigator.clipboard.writeText(url);
-      setCopyText('Copied!');
-      setTimeout(() => setCopyText(''), 1600);
-    } catch (err) {
-      setCopyText('Copy failed');
-      setTimeout(() => setCopyText(''), 1600);
-    }
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1800);
+    } catch { /* ignore */ }
   };
 
   const handleOpenAnalytics = async (url) => {
@@ -82,25 +80,18 @@ const Dashboard = () => {
     try {
       const data = await urlService.getAnalytics(url.short_code);
       setAnalyticsData(data);
-    } catch (err) {
+    } catch {
       setAnalyticsData({ error: 'Failed to load analytics' });
     } finally {
       setAnalyticsLoading(false);
     }
   };
 
-  const handleCloseAnalytics = () => {
-    setAnalyticsUrl(null);
-    setAnalyticsData(null);
-  };
+  const handleCloseAnalytics = () => { setAnalyticsUrl(null); setAnalyticsData(null); };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Never';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const maxDailyCount = analyticsData?.dailyClicks?.length
@@ -109,40 +100,31 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-page">
+      {/* ── Navbar ── */}
       <nav className="navbar">
-        <div className="navbar-container">
-          <div className="navbar-content">
-            <div className="navbar-brand">URL Shortener</div>
-            <div className="navbar-actions">
-              <button onClick={handleLogout} className="logout-btn">
-                Logout
-              </button>
-            </div>
-          </div>
+        <div className="navbar-inner">
+          <span className="navbar-brand">🔗 URL Shortener</span>
+          <button onClick={handleLogout} className="logout-btn">Logout</button>
         </div>
       </nav>
 
       <main className="dashboard-main">
-        <div className="dashboard-section">
-          <div className="section-header">
-            <h2>Shorten a URL</h2>
-          </div>
-          <form className="shorten-form" onSubmit={handleShorten}>
+
+        {/* ── Shorten form ── */}
+        <div className="form-card">
+          <h2 className="form-card-title">Shorten a URL</h2>
+          <form onSubmit={handleShorten}>
             <div className="form-row">
               <input
                 type="url"
                 value={longUrl}
                 onChange={(e) => setLongUrl(e.target.value)}
-                placeholder="Enter long URL"
+                placeholder="https://your-long-url.com/goes/here"
                 required
                 className="url-input"
               />
-              <button
-                type="submit"
-                disabled={shortening}
-                className="shorten-btn"
-              >
-                {shortening ? 'Shortening...' : 'Shorten'}
+              <button type="submit" disabled={shortening} className="shorten-btn">
+                {shortening ? 'Shortening…' : 'Shorten'}
               </button>
             </div>
             <div className="alias-row">
@@ -157,91 +139,102 @@ const Dashboard = () => {
                 title="3–50 characters: letters, numbers, hyphens, underscores"
               />
             </div>
-            {error && <p className="error-message">{error}</p>}
+            {error && <p className="error-msg">{error}</p>}
           </form>
         </div>
 
-        <div className="dashboard-section">
-          <div className="section-header">
-            <h2>Your URLs</h2>
-          </div>
+        {/* ── URL grid ── */}
+        <div className="urls-section">
+          <h2 className="section-title">Your URLs</h2>
+
           {loading ? (
-            <p className="loading-message">Loading...</p>
+            <p className="state-msg">Loading…</p>
           ) : urls.length === 0 ? (
-            <p className="empty-message">No URLs yet. Create your first short URL above!</p>
+            <p className="state-msg">No URLs yet — create your first one above!</p>
           ) : (
-            <>
-              <div className={copyText ? 'toast show' : 'toast'}>{copyText}</div>
-              <div className="urls-grid">
-              {urls.map((url) => (
-                <div key={url.id} className="url-card">
-                  <div className="url-card-header">
-                    <div className="url-card-title">
-                      <h3>Shortened URL</h3>
-                      <span className="url-created-date">
-                        Created: {new Date(url.created_at).toLocaleDateString()}
+            <div className="urls-grid">
+              {urls.map((url) => {
+                const filled = activityLevel(url.clicks);
+                const shortUrl = getShortUrl(url.short_code);
+                return (
+                  <div key={url.id} className="url-card">
+
+                    {/* Header row */}
+                    <div className="card-header">
+                      <span className="card-code">/{url.short_code}</span>
+                      <span className="card-date">
+                        <span className="dot" />
+                        {formatDate(url.created_at)}
                       </span>
                     </div>
-                    <div className="url-clicks">
-                      <div className="clicks-count">{url.clicks}</div>
-                      <div className="clicks-label">Clicks</div>
-                    </div>
-                  </div>
 
-                  <div className="url-card-content">
-                    <div className="url-section">
-                      <label className="url-label">Original URL</label>
-                      <p className="original-url" title={url.long_url}>
-                        {url.long_url.length > 60 ? `${url.long_url.substring(0, 60)}...` : url.long_url}
-                      </p>
+                    {/* Meta */}
+                    <div className="card-meta">
+                      <span>{url.clicks} {url.clicks === 1 ? 'click' : 'clicks'}</span>
+                      <span className="meta-sep">·</span>
+                      <span>{new Date(url.created_at).toLocaleDateString()}</span>
                     </div>
 
-                    <div className="url-section">
-                      <label className="url-label">Short URL</label>
-                      <div className="short-url-container">
-                        <a
-                          href={getShortUrl(url.short_code)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="short-url-link"
-                        >
-                          {getShortUrl(url.short_code)}
-                        </a>
+                    {/* Original URL */}
+                    <p className="card-description" title={url.long_url}>
+                      {url.long_url.length > 72
+                        ? url.long_url.slice(0, 72) + '…'
+                        : url.long_url}
+                    </p>
+
+                    {/* Activity circles */}
+                    <div className="card-circles">
+                      {[0, 1, 2, 3].map((i) => (
+                        <span key={i} className={`circle ${i < filled ? 'active' : ''}`} />
+                      ))}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="card-footer">
+                      <div className="footer-stats">
+                        <div className="footer-stat">
+                          <strong>{url.clicks}</strong>
+                          <span>Clicks</span>
+                        </div>
+                        <div className="footer-stat">
+                          <button
+                            className="copy-btn"
+                            onClick={() => handleCopy(shortUrl, url.id)}
+                            title="Copy short URL"
+                          >
+                            <FiClipboard size={14} />
+                            {copiedId === url.id ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="footer-actions">
                         <button
-                          onClick={() => handleCopy(getShortUrl(url.short_code))}
-                          className="copy-btn"
-                          title="Copy to clipboard"
+                          className="analytics-icon-btn"
+                          onClick={() => handleOpenAnalytics(url)}
+                          title="Analytics"
                         >
-                          <FiClipboard size={18} />
+                          <FiBarChart2 size={16} />
+                        </button>
+                        <button
+                          className="visit-btn"
+                          onClick={() => window.open(shortUrl, '_blank')}
+                        >
+                          <FiExternalLink size={14} style={{ marginRight: '0.3rem' }} />
+                          Visit Link
                         </button>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="url-card-actions">
-                    <button
-                      onClick={() => window.open(getShortUrl(url.short_code), '_blank')}
-                      className="action-btn visit-btn"
-                    >
-                      <FiExternalLink size={16} style={{ marginRight: '0.4rem' }} />
-                      Visit Link
-                    </button>
-                    <button
-                      onClick={() => handleOpenAnalytics(url)}
-                      className="action-btn analytics-btn"
-                    >
-                      <FiBarChart2 size={16} style={{ marginRight: '0.4rem' }} />
-                      Analytics
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </>
           )}
         </div>
       </main>
 
+      {/* ── Analytics modal ── */}
       {analyticsUrl && (
         <div className="analytics-overlay" onClick={handleCloseAnalytics}>
           <div className="analytics-modal" onClick={(e) => e.stopPropagation()}>
@@ -251,44 +244,40 @@ const Dashboard = () => {
                 <FiX size={20} />
               </button>
             </div>
-
-            <div className="analytics-short-code">
-              {getShortUrl(analyticsUrl.short_code)}
-            </div>
+            <div className="analytics-short-code">{getShortUrl(analyticsUrl.short_code)}</div>
 
             {analyticsLoading ? (
-              <p className="analytics-loading">Loading analytics...</p>
+              <p className="analytics-state">Loading analytics…</p>
             ) : analyticsData?.error ? (
-              <p className="analytics-error">{analyticsData.error}</p>
+              <p className="analytics-state error">{analyticsData.error}</p>
             ) : analyticsData ? (
               <div className="analytics-body">
                 <div className="analytics-stats">
                   <div className="analytics-stat">
-                    <div className="analytics-stat-value">{analyticsData.totalClicks}</div>
-                    <div className="analytics-stat-label">Total Clicks</div>
+                    <div className="stat-value">{analyticsData.totalClicks}</div>
+                    <div className="stat-label">Total Clicks</div>
                   </div>
                   <div className="analytics-stat">
-                    <div className="analytics-stat-value">{formatDate(analyticsData.lastAccessed)}</div>
-                    <div className="analytics-stat-label">Last Accessed</div>
+                    <div className="stat-value">{formatDate(analyticsData.lastAccessed)}</div>
+                    <div className="stat-label">Last Accessed</div>
                   </div>
                 </div>
-
                 <div className="analytics-daily">
                   <h4>Daily Clicks (last 30 days)</h4>
                   {analyticsData.dailyClicks.length === 0 ? (
-                    <p className="analytics-no-data">No clicks recorded yet.</p>
+                    <p className="analytics-state">No clicks recorded yet.</p>
                   ) : (
                     <div className="analytics-chart">
                       {analyticsData.dailyClicks.map((day) => (
-                        <div key={day.date} className="analytics-bar-row">
-                          <span className="analytics-bar-date">{formatDate(day.date)}</span>
-                          <div className="analytics-bar-track">
+                        <div key={day.date} className="bar-row">
+                          <span className="bar-date">{formatDate(day.date)}</span>
+                          <div className="bar-track">
                             <div
-                              className="analytics-bar-fill"
+                              className="bar-fill"
                               style={{ width: `${(day.count / maxDailyCount) * 100}%` }}
                             />
                           </div>
-                          <span className="analytics-bar-count">{day.count}</span>
+                          <span className="bar-count">{day.count}</span>
                         </div>
                       ))}
                     </div>
