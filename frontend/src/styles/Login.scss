@@ -94,6 +94,32 @@
         }
       }
 
+      .divider {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        margin: 1rem 0;
+        color: #666666;
+        font-size: 0.875rem;
+
+        &::before,
+        &::after {
+          content: '';
+          flex: 1;
+          border-bottom: 1px solid #444444;
+        }
+
+        span {
+          padding: 0 0.75rem;
+        }
+      }
+
+      .google-login-wrapper {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 1rem;
+      }
+
       .auth-link {
         text-align: center;
         font-weight: 500;

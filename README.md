@@ -7,12 +7,14 @@ A production-grade, full-stack URL shortening service built with Node.js, Expres
 ## 🚀 Features
 
 - **JWT Authentication** — Secure register/login; all write operations are protected
+- **Google Sign-In** — One-click login via Google; accounts linked automatically by email
 - **URL Shortening** — Convert any long URL into a short, shareable link
 - **Custom Aliases** — Choose your own slug (e.g. `/my-portfolio`) instead of a random code
 - **Click Analytics** — Per-link total clicks, last-accessed timestamp, and daily click breakdown (last 30 days)
 - **IP & User-Agent Tracking** — Every redirect records visitor IP and browser info
 - **Copy to Clipboard** — One-click copy on every URL card in the dashboard
 - **Rate Limiting** — 100 req/15 min globally; 10 req/15 min on auth routes
+- **Input Validation & SSRF Protection** — URLs are validated for protocol and blocked against private/loopback IP ranges
 - **Proper Error Handling** — Global error handler; consistent HTTP status codes throughout
 - **User-Specific URLs** — Each user sees only their own links
 - **Protected Routes** — Frontend and backend both enforce authentication
@@ -28,19 +30,19 @@ A production-grade, full-stack URL shortening service built with Node.js, Expres
 └──────────────────────┬─────────────────────────────────┘
                        │ HTTP (Axios + JWT Bearer token)
 ┌──────────────────────▼─────────────────────────────────┐
-│                   Express Backend                      │
+│                 Express Backend                        │
 │                                                        │
-│  Middleware stack:                                     │
-│    helmet → cors → rate-limit → json → routes          │
+│                Middleware stack:                       │
+│      helmet → cors → rate-limit → json → routes        │
 │                                                        │
-│  Routes                                                │
+│                    Routes                              │
 │    /auth          → authRoutes → authController        │
 │    /shorten       → urlRoutes  → urlController         │
 │    /links         → urlRoutes  → urlController         │
 │    /analytics/:c  → urlRoutes  → urlController         │
 │    /:shortCode    → urlRoutes  → redirect              │
 │                                                        │
-│  Services → Models → PostgreSQL (pg Pool)              │
+│       Services → Models → PostgreSQL (pg Pool)         │
 └──────────────────────┬─────────────────────────────────┘
                        │
 ┌──────────────────────▼─────────────────────────────────┐
@@ -48,12 +50,6 @@ A production-grade, full-stack URL shortening service built with Node.js, Expres
 │            users | urls | url_clicks                   │
 └────────────────────────────────────────────────────────┘
 ```
-
-**Request lifecycle (URL redirect):**
-1. Browser hits `GET /:shortCode`
-2. `urlController.redirect` looks up the short code in `urls`
-3. If found → increments `urls.clicks`, inserts a row in `url_clicks` (IP, UA, timestamp)
-4. Returns `302` to `long_url`
 
 ---
 
@@ -64,14 +60,46 @@ A production-grade, full-stack URL shortening service built with Node.js, Expres
 | Runtime | Node.js |
 | Framework | Express.js |
 | Database | PostgreSQL |
-| Auth | JWT + bcryptjs |
-| Security | helmet, express-rate-limit |
+| Auth | JWT + bcryptjs + Google OpenID Connect |
+| Security | helmet, express-rate-limit, google-auth-library |
 | ORM/Client | pg (node-postgres) |
 | Frontend | React 19 + React Router 7 |
 | HTTP client | Axios |
 | Styling | SCSS |
 | Build tool | Vite |
 | Testing | Jest, Supertest, React Testing Library |
+
+---
+
+## 🔐 Security
+
+- **Rate limiting** — 100 req/15 min globally; stricter 10 req/15 min on `/auth/*` to slow credential-stuffing
+- **Input validation** — URLs must use `http`/`https`; hostnames are checked against private IPv4 ranges to prevent SSRF (loopback, RFC-1918, link-local)
+- **Google Sign-In** — ID token is cryptographically verified server-side via `google-auth-library`; Google tokens are never stored
+- **Secure headers** — `helmet` sets CSP, HSTS, X-Frame-Options, and more on every response
+- **Passwords** — hashed with bcrypt
+
+---
+
+## 🔢 Short Code Generation
+
+Random codes are generated in `backend/utils/shortCodeGenerator.js` using **Base62 encoding** over cryptographically random bytes:
+
+```
+Alphabet: 0-9 a-z A-Z  (62 characters)
+Length:   6 characters
+Space:    62^6 = ~56.8 billion unique codes
+```
+
+**Why Base62?**
+- URL-safe: no special characters, no encoding needed
+- Compact: 6 characters is short enough to fit in a tweet, SMS, or QR code
+- Large enough: 56 billion codes covers hundreds of millions of URLs with negligible collision probability
+
+**Collision handling:**
+`generateUniqueShortCode()` queries `existsShortCode()` after each generation and retries up to 10 times before throwing.
+
+**Custom aliases** skip random generation entirely and are validated client-side and server-side with `/^[a-zA-Z0-9_-]{3,50}$/`.
 
 ---
 
@@ -103,6 +131,18 @@ Login and receive a JWT token.
 **Response `200`:**
 ```json
 { "token": "<jwt>", "user": { "id": 1, "email": "user@example.com" } }
+```
+
+#### `POST /auth/google`
+Sign in (or register) with a Google ID token.
+
+**Body:**
+```json
+{ "credential": "<google_id_token>" }
+```
+**Response `200`:**
+```json
+{ "token": "<jwt>", "user": { "id": 1, "email": "user@google.com" } }
 ```
 
 ---

@@ -16,4 +16,25 @@ async function findByEmail(email) {
   return rows[0];
 }
 
-module.exports = { createUser, findByEmail };
+async function findByGoogleId(googleId) {
+  const { rows } = await db.query('SELECT * FROM users WHERE google_id = $1', [googleId]);
+  return rows[0];
+}
+
+async function createGoogleUser(email, googleId) {
+  const { rows } = await db.query(
+    'INSERT INTO users(email, google_id) VALUES($1, $2) RETURNING id, email',
+    [email, googleId]
+  );
+  return rows[0];
+}
+
+async function linkGoogleId(userId, googleId) {
+  const { rows } = await db.query(
+    'UPDATE users SET google_id = $1 WHERE id = $2 RETURNING id, email',
+    [googleId, userId]
+  );
+  return rows[0];
+}
+
+module.exports = { createUser, findByEmail, findByGoogleId, createGoogleUser, linkGoogleId };

@@ -10,21 +10,54 @@ const {
 } = require('../models/urlModel');
 const { generateUniqueShortCode } = require('../utils/shortCodeGenerator');
 
+const ALLOWED_PROTOCOLS = new Set(['http:', 'https:']);
+
+function isBlockedHostname(hostname) {
+  if (!hostname) return true;
+  const h = hostname.toLowerCase();
+  if (h === 'localhost' || h === '::1' || h === '[::1]') return true;
+
+  // IPv4 checks
+  const parts = h.split('.');
+  if (parts.length === 4) {
+    const [a, b] = parts.map(Number);
+    if (a === 127) return true;                          // 127.0.0.0/8 loopback
+    if (a === 10) return true;                           // 10.0.0.0/8 private
+    if (a === 172 && b >= 16 && b <= 31) return true;   // 172.16.0.0/12 private
+    if (a === 192 && b === 168) return true;             // 192.168.0.0/16 private
+    if (a === 169 && b === 254) return true;             // 169.254.0.0/16 link-local
+    if (a === 0) return true;                            // 0.x.x.x unspecified
+  }
+  return false;
+}
+
 function normalizeUrl(inputUrl) {
+  let parsed;
   try {
-    const url = new URL(inputUrl);
-    return url.toString();
-  } catch (err) {
-    // try auto-fix by adding protocol
+    parsed = new URL(inputUrl);
+  } catch {
     try {
-      const url = new URL(`http://${inputUrl}`);
-      return url.toString();
-    } catch (innerErr) {
-      const error = new Error('Invalid URL format');
-      error.status = 400;
-      throw error;
+      parsed = new URL(`http://${inputUrl}`);
+    } catch {
+      const err = new Error('Invalid URL format');
+      err.status = 400;
+      throw err;
     }
   }
+
+  if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
+    const err = new Error('Only http and https URLs are allowed');
+    err.status = 400;
+    throw err;
+  }
+
+  if (isBlockedHostname(parsed.hostname)) {
+    const err = new Error('URL hostname is not allowed');
+    err.status = 400;
+    throw err;
+  }
+
+  return parsed.toString();
 }
 
 const ALIAS_RE = /^[a-zA-Z0-9_-]{3,50}$/;

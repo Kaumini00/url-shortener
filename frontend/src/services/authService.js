@@ -44,6 +44,13 @@ export const authService = {
     return response.data;
   },
 
+  googleLogin: async (credential) => {
+    const response = await api.post('/auth/google', { credential });
+    const { token } = response.data;
+    setToken(token);
+    return response.data;
+  },
+
   logout: () => {
     removeToken();
   },
