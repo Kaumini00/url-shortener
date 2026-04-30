@@ -20,6 +20,16 @@ A production-grade, full-stack URL shortening service built with Node.js, Expres
 - **Protected Routes** — Frontend and backend both enforce authentication
 
 ---
+## API Documentation
+
+📄 [API Reference](docs/API.md) 
+
+🔗 [Interactive Docs (SwaggerHub)](https://app.swaggerhub.com/apis/ifs-e5d/url-shortener-api/1.0.0)
+
+Interactive API documentation is available on SwaggerHub.
+Explore all endpoints, request/response schemas, and error codes.
+
+---
 
 ## 🏗 Architecture
 
